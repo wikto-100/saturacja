@@ -1,0 +1,184 @@
+{% extends "network/base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/map.css' %}">
+{% endblock %}
+
+{% block content %}
+<div id="error-message" style="display:none; color:red; font-weight:bold; margin: 10px 0;"></div>
+
+<!-- Top Navigation Bar -->
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="#">Saturacja - Telgam S.A.</a>
+    <div class="ms-3 me-3">
+      <select id="department-switch" class="form-select form-select-sm">
+        {% for dept in departments %}
+        <option value="{{ dept.id }}" {% if dept.id == current_department.id %}selected{% endif %}>{{ dept.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <span id="session-countdown" class="navbar-text ms-auto"></span>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+      aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Przełącz nawigację">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <button id="import-btn" class="btn btn-outline-secondary me-2">Import (MMS)</button>
+        </li>
+        <li class="nav-item">
+          <button id="export-btn" class="btn btn-outline-secondary me-2">Eksport</button>
+        </li>
+        <li class="nav-item">
+          <!-- New Instruction button -->
+          <button id="instruction-btn" class="btn btn-outline-info me-2" data-bs-toggle="modal"
+            data-bs-target="#instructionModal">Instrukcja</button>
+        </li>
+        <li class="nav-item">
+          <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger">Wyloguj</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- Hidden file input for CSV import -->
+<input type="file" id="csv-file-input" accept=".csv" style="display:none;">
+
+<!-- Map Container -->
+<div id="map"></div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay">
+  <div class="spinner-border text-primary" role="status">
+    <span class="visually-hidden">Ładowanie...</span>
+  </div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="exportModalLabel">Eksport danych</h1>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+      </div>
+      <div class="modal-body">
+        <form id="export-form">
+          <div class="mb-3">
+            <label for="export-city" class="form-label">Miejscowość</label>
+            <input type="text" class="form-control" id="export-city" placeholder="Wprowadź miejscowość">
+          </div>
+          <div class="mb-3">
+            <label for="export-street" class="form-label">Ulica (opcjonalnie)</label>
+            <input type="text" class="form-control" id="export-street" placeholder="Wprowadź ulicę">
+          </div>
+          <div class="mb-3">
+            <label for="export-status" class="form-label">Status klienta</label>
+            <select class="form-select" id="export-status">
+              <option value="active">Aktywni</option>
+              <option value="inactive">Nieaktywni</option>
+              <option value="both" selected>Dowolny</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary">Eksportuj</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Instruction Modal -->
+<div class="modal fade" id="instructionModal" tabindex="-1" aria-labelledby="instructionModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="instructionModalLabel">Instrukcja korzystania z aplikacji</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+      </div>
+      <div class="modal-body">
+        <p>Witamy w aplikacji Saturacja - Telgam S.A.</p>
+        <ul>
+          <ul>
+            <li>
+              <strong>Import danych:</strong> Aby zaimportować dane, pobierz raport z systemu MMS – przejdź do zakładki
+              <em>Raporty &gt; Aktywne adresy &gt; Eksport CSV</em>, a następnie użyj przycisku <strong>Import
+                (MMS)</strong> do wczytania pliku CSV.
+            </li>
+            <li>
+              <strong>Eksport danych:</strong> Aby wyeksportować dane, użyj przycisku <strong>Eksport</strong> i
+              wprowadź nazwę miejscowości, (opcjonalnie) ulicę oraz status klienta.
+            </li>
+            <li>
+              <strong>Interpretacja danych:</strong>
+              <ul>
+                <li><span style="color:green;">zielone kropki</span> – aktywni klienci (nasze dane),</li>
+                <li><span style="color:red;">czerwone kropki</span> – nieaktywne adresy,</li>
+                <li><span style="color:orange;">pomarańczowe kropki</span> – pomiary saturacji wykonane w wybranym
+                  obszarze.</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Interakcja z mapą:</strong> Kliknij na dowolny marker, aby wyświetlić szczegółowe dane. W
+              przypadku pomiarów saturacji kliknięcie wyświetli informacje o liczbie aktywnych i nieaktywnych klientów
+              oraz wskaźnik saturacji.
+            </li>
+            <li>
+              <strong>Wybór wielokąta:</strong> Użyj narzędzia rysowania (ikona wielokąta) dostępnego na mapie. Kliknij,
+              aby dodać kolejne punkty, a zakończ rysowanie, klikając pierwszy punkt. Po narysowaniu obszaru możesz:
+              <ul>
+                <li>Importować nieaktywne adresy z wybranego obszaru – przycisk <strong>Importuj adresy</strong>,</li>
+                <li>Usunąć nieaktywne adresy z obszaru – przycisk <strong>Usuń adresy</strong>,</li>
+                <li>Wykonać pomiar saturacji – przycisk <strong>Pomiar</strong>.</li>
+              </ul>
+            </li>
+            <li>
+              <strong>Edycja i usuwanie wielokątów:</strong> Po narysowaniu wielokąta możesz go edytować, przeciągając
+              punkty, lub usunąć używając opcji edycji dostępnych w narzędziu.
+            </li>
+            <li>
+              W przypadku problemów lub pytań skontaktuj się z administratorem systemu.
+            </li>
+          </ul>
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pass server-side data to JS -->
+<script>
+  var remaining = parseInt("{{ remaining_seconds|default:'0' }}", 10);
+
+  function updateCountdown() {
+    var minutes = Math.floor(remaining / 60);
+    var seconds = Math.floor(remaining % 60);
+    document.getElementById("session-countdown").innerText =
+      "Sesja wygasa za: " + minutes + "m " + seconds + "s";
+    if (remaining <= 0) {
+      clearInterval(timer);
+      document.getElementById("session-countdown").innerText = "Sesja wygasła";
+    }
+    remaining--;
+  }
+
+  var timer = setInterval(updateCountdown, 1000);
+  updateCountdown();
+  var activeData = JSON.parse('{{ active_clients_geojson|escapejs }}');
+  var inactiveData = JSON.parse('{{ inactive_clients_geojson|escapejs }}');
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/map.js' %}"></script>
+{% endblock %}
