@@ -80,7 +80,7 @@ ASGI_APPLICATION = "saturacja.asgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": os.environ.get("DB_NAME", "db"),
+        "NAME": os.environ.get("DB_NAME", "saturacja_db"),
         "USER": os.environ.get("DB_USER", "user"),
         "PASSWORD": os.environ.get("DB_PASSWORD", "user"),
         "HOST": os.environ.get("DB_HOST", "localhost"),
@@ -120,6 +120,11 @@ LOGOUT_REDIRECT_URL = "/login/"
 # Optionally, force secure cookies if using HTTPS
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+
+# HTTP Strict Transport Security (HSTS) settings
+SECURE_HSTS_SECONDS = 31536000  # 1 year in seconds
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
 
 # Logging configuration (simplified example)
 LOGGING = {
